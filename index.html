@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Texas Hold'em Monte Carlo</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        padding: 1rem;
+      }
+      .card-select {
+        display: inline-block;
+        margin: 0.5rem;
+      }
+      .section {
+        margin-bottom: 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>Select Your Hand</h2>
+
+    <div class="section" id="player-cards">
+      <div class="card-select">
+        Card 1:
+        <select class="rank"></select
+        ><select class="suit"></select>
+      </div>
+      <div class="card-select">
+        Card 2:
+        <select class="rank"></select
+        ><select class="suit"></select>
+      </div>
+    </div>
+
+    <h3>Optional: Community Cards</h3>
+    <div class="section" id="community-cards">
+      <div class="card-select">
+        Flop 1:
+        <select class="rank">
+          <option value="">--</option></select
+        ><select class="suit">
+          <option value="">--</option>
+        </select>
+      </div>
+      <div class="card-select">
+        Flop 2:
+        <select class="rank">
+          <option value="">--</option></select
+        ><select class="suit">
+          <option value="">--</option>
+        </select>
+      </div>
+      <div class="card-select">
+        Flop 3:
+        <select class="rank">
+          <option value="">--</option></select
+        ><select class="suit">
+          <option value="">--</option>
+        </select>
+      </div>
+      <div class="card-select">
+        Turn:
+        <select class="rank">
+          <option value="">--</option></select
+        ><select class="suit">
+          <option value="">--</option>
+        </select>
+      </div>
+      <div class="card-select">
+        River:
+        <select class="rank">
+          <option value="">--</option></select
+        ><select class="suit">
+          <option value="">--</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="section">
+      <label
+        >Opponent Count:
+        <input type="number" id="opponent-count" min="1" value="2"
+      /></label>
+      <button onclick="getCard()">Run Simulation</button>
+    </div>
+
+    <div id="result"></div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
