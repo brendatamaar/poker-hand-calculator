@@ -29,6 +29,16 @@ const HAND_TYPES = [
   "Royal Flush",
 ];
 
+const FULL_DECK = (() => {
+  const deck = [];
+  for (const suit of suits) {
+    for (const rank of ranks) {
+      deck.push(rank + suit);
+    }
+  }
+  return deck;
+})();
+
 function populateDropdowns() {
   document.querySelectorAll(".rank").forEach((select) => {
     select.innerHTML += ranks
@@ -56,29 +66,19 @@ function getSelectedCards(parentId) {
   return cards;
 }
 
-// build excluded deck without player hands
-function buildExcludedDeck(excludedCards) {
-  const deck = [];
-  for (const suit of suits) {
-    for (const rank of ranks) {
-      const card = rank + suit;
-      if (!excludedCards.includes(card)) deck.push(card);
-    }
-  }
-  return deck;
+// build deck excluding player hand
+function buildDeck(excludedCards) {
+  const excluded = new Set(excludedCards);
+  return FULL_DECK.filter((card) => !excluded.has(card));
 }
 
 // Get random cards from deck
 function drawCards(deck, count) {
-  const cards = [];
-  const availableCards = [...deck];
-
-  for (let i = 0; i < count; i++) {
-    const idx = Math.floor(Math.random() * availableCards.length);
-    cards.push(availableCards.splice(idx, 1)[0]);
+  for (let i = deck.length - 1; i > deck.length - 1 - count; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
   }
-
-  return cards;
+  return deck.slice(deck.length - count);
 }
 
 // Generate all combinations of 5 cards from 7
@@ -282,133 +282,48 @@ function compareHandEvaluations(eval1, eval2) {
   return 0.5; // Tie
 }
 
-// Calculate hand type probabilities for player
-function calculatePlayerHandTypeProbabilities(playerHand, iterations = 1000) {
-  const handCounts = {};
-  HAND_TYPES.forEach((type) => (handCounts[type] = 0));
-
-  for (let i = 0; i < iterations; i++) {
-    const deck = buildExcludedDeck(playerHand);
-    const communityCards = drawCards(deck, 5);
-    const playerSevenCards = [...playerHand, ...communityCards];
-    const playerBestHand = findBestHand(playerSevenCards);
-
-    handCounts[playerBestHand.type]++;
-  }
-
-  // Convert counts to percentages
-  const results = {};
-  HAND_TYPES.forEach((type) => {
-    results[type] = ((handCounts[type] / iterations) * 100).toFixed(2) + "%";
-  });
-
-  return results;
-}
-
 // Calculate hand type probabilities for both player and opponent
 function calculate(playerHand, iterations) {
-  const playerHandCounts = {};
-  const opponentHandCounts = {};
+  const playerCounts = Object.fromEntries(HAND_TYPES.map((t) => [t, 0]));
+  const opponentCounts = Object.fromEntries(HAND_TYPES.map((t) => [t, 0]));
 
-  HAND_TYPES.forEach((type) => {
-    playerHandCounts[type] = 0;
-    opponentHandCounts[type] = 0;
-  });
+  const decks = buildDeck(playerHand);
 
   for (let i = 0; i < iterations; i++) {
-    const deck = buildExcludedDeck(playerHand);
-
-    // Deal opponent cards and community cards
+    const deck = [...decks];
     const opponentHand = drawCards(deck, 2);
     const communityCards = drawCards(deck, 5);
 
-    // Create 7-card hands for both players
-    const playerSevenCards = [...playerHand, ...communityCards];
-    const opponentSevenCards = [...opponentHand, ...communityCards];
+    const playerBest = findBestHand([...playerHand, ...communityCards]);
+    const opponentBest = findBestHand([...opponentHand, ...communityCards]);
 
-    // Find best hands for both players
-    const playerBestHand = findBestHand(playerSevenCards);
-    const opponentBestHand = findBestHand(opponentSevenCards);
-
-    // Count hand types
-    playerHandCounts[playerBestHand.type]++;
-    opponentHandCounts[opponentBestHand.type]++;
+    playerCounts[playerBest.type]++;
+    opponentCounts[opponentBest.type]++;
   }
 
-  // Convert counts to percentages
+  const toPercent = (count) => ((count / iterations) * 100).toFixed(2) + "%";
+
   const playerResults = {};
   const opponentResults = {};
 
-  HAND_TYPES.forEach((type) => {
-    playerResults[type] =
-      ((playerHandCounts[type] / iterations) * 100).toFixed(2) + "%";
-    opponentResults[type] =
-      ((opponentHandCounts[type] / iterations) * 100).toFixed(2) + "%";
-  });
+  for (const type of HAND_TYPES) {
+    playerResults[type] = toPercent(playerCounts[type]);
+    opponentResults[type] = toPercent(opponentCounts[type]);
+  }
 
   return { player: playerResults, opponent: opponentResults };
 }
 
-// Main calculation function
-function run() {
-  const playerHand = getSelectedCards("player-cards");
-  const simulationCount = 10;
-
-  if (playerHand.length !== 2) {
-    alert("Please select exactly 2 cards!");
-    return;
-  }
-
-  if (playerHand[0] === playerHand[1]) {
-    alert("Error: Duplicate cards are not allowed.");
-    return;
-  }
-
-  const resultDiv = document.getElementById("result");
-  resultDiv.innerHTML = "<p>Calculating... (1000 simulations)</p>";
-
-  setTimeout(() => {
-    // Calculate winning probability
-    const equity = simulate(playerHand, simulationCount);
-
-    // Calculate hand type probabilities for both player and opponent
-    const handProbs = calculate(playerHand, simulationCount);
-
-    // Display results
-    let resultHTML = `
-		<h3>Player Hand: ${playerHand.join(", ")}</h3>
-		<h4>Winning probability (vs 1 opponent with 5 community cards):</h4>
-		<p>Win Probability: ${equity.winProb}%</p>
-		<p>Tie Probability: ${equity.tieProb}%</p>
-		<p>Lose Probability: ${equity.loseProb}%</p>
-		
-		<h4>Hand Type Probabilities Comparison:</h4>
-		<table>
-		  <tr><th>Hand Type</th><th>Player</th><th>Opponent</th></tr>
-	  `;
-
-    HAND_TYPES.forEach((type) => {
-      resultHTML += `<tr><td>${type}</td><td>${handProbs.player[type]}</td><td>${handProbs.opponent[type]}</td></tr>`;
-    });
-
-    resultHTML += `
-		</table>
-		<p><small>Based on ${simulationCount} simulation(s)</small></p>
-	  `;
-
-    resultDiv.innerHTML = resultHTML;
-  }, 10);
-}
-
-// Main simulation function
+// Calculate winning probabilities using monte carlo simulation
 function simulate(playerHand, iterations) {
   let wins = 0,
     ties = 0,
     losses = 0;
 
-  for (let i = 0; i < iterations; i++) {
-    const deck = buildExcludedDeck(playerHand);
+  const decks = buildDeck(playerHand);
 
+  for (let i = 0; i < iterations; i++) {
+    const deck = [...decks];
     // Deal opponent cards and community cards
     const opponentHand = drawCards(deck, 2);
     const communityCards = drawCards(deck, 5);
@@ -434,4 +349,55 @@ function simulate(playerHand, iterations) {
     tieProb: ((ties / iterations) * 100).toFixed(2),
     loseProb: ((losses / iterations) * 100).toFixed(2),
   };
+}
+
+// Main calculation function
+function run() {
+  const playerHand = getSelectedCards("player-cards");
+  const simulationCount = 1000;
+
+  if (playerHand.length !== 2) {
+    alert("Please select exactly 2 cards!");
+    return;
+  }
+
+  if (playerHand[0] === playerHand[1]) {
+    alert("Error: Duplicate cards are not allowed.");
+    return;
+  }
+
+  const resultDiv = document.getElementById("result");
+  resultDiv.innerHTML = "<p>Calculating...</p>";
+
+  setTimeout(() => {
+    // Calculate winning probability
+    const equity = simulate(playerHand, simulationCount);
+
+    // Calculate hand type probabilities for both player and opponent
+    const handProbs = calculate(playerHand, simulationCount);
+
+    // Display results
+    let resultHTML = `
+		  <h3>Player Hand: ${playerHand.join(", ")}</h3>
+		  <h4>Winning probability (vs 1 opponent with 5 community cards):</h4>
+		  <p>Win Probability: ${equity.winProb}%</p>
+		  <p>Tie Probability: ${equity.tieProb}%</p>
+		  <p>Lose Probability: ${equity.loseProb}%</p>
+		  
+		  <h4>Hand Type Probabilities Comparison:</h4>
+		  <table>
+			<tr><th>Hand Type</th><th>Player</th><th>Opponent</th></tr>
+		`;
+
+    HAND_TYPES.forEach((type) => {
+      resultHTML += `<tr><td>${type}</td><td>${handProbs.player[type]}</td><td>${handProbs.opponent[type]}</td></tr>`;
+    });
+
+    resultHTML += `
+		  </table>
+		  <p><small>Based on ${simulationCount} simulation(s)</small></p>
+		`;
+
+    resultDiv.innerHTML = resultHTML;
+  }, 10);
 }
